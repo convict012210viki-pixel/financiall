@@ -1001,7 +1001,10 @@ async function uploadAttachment(day){
     let record = null;
     if(assetsApi){
       try{
-        const res = await assetsApi.upload(blob, {type: blob.type || file.type || "image/jpeg"});
+        const res = await Promise.race([
+          assetsApi.upload(blob, {type: blob.type || file.type || "image/jpeg"}),
+          new Promise((_, rej)=>setTimeout(()=>rej(new Error("بعدت مهلة الرفع — سحيب للخزنة تحسبًا")), 15000))
+        ]);
         record = {id:res.id, url:res.url, name:file.name};
       }catch(assetErr){
         record = null; // fall through to db fallback
