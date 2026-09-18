@@ -1001,10 +1001,7 @@ async function uploadAttachment(day){
     let record = null;
     if(assetsApi){
       try{
-        const res = await Promise.race([
-          assetsApi.upload(blob, {type: blob.type || file.type || "image/jpeg"}),
-          new Promise((_, rej)=>setTimeout(()=>rej(new Error("بعدت مهلة الرفع — سحيب للخزنة تحسبًا")), 15000))
-        ]);
+        const res = await assetsApi.upload(blob, {type: blob.type || file.type || "image/jpeg"});
         record = {id:res.id, url:res.url, name:file.name};
       }catch(assetErr){
         record = null; // fall through to db fallback
@@ -1035,8 +1032,6 @@ async function removeAttachment(day, idx){
   branchSalesDoc.attachments[day].splice(idx,1);
   await saveSalesDoc(currentUser.code, monthKeyOf(viewYear, viewMonth), branchSalesDoc);
   if(f && f.id && assetsApi){ try{ await assetsApi.delete(f.id); }catch(e){} }
-  const host = document.getElementById("gridHost") || document.getElementById("viewGrid");
-  if(host) renderGrid(host, branchOrViewDoc(), currentUser.type==="branch", viewYear, viewMonth);
   openAttachModal(day, true);
 }
 function closeModal(){ const h=document.getElementById("modalHost"); if(h) h.innerHTML=""; }
