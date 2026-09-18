@@ -1035,6 +1035,8 @@ async function removeAttachment(day, idx){
   branchSalesDoc.attachments[day].splice(idx,1);
   await saveSalesDoc(currentUser.code, monthKeyOf(viewYear, viewMonth), branchSalesDoc);
   if(f && f.id && assetsApi){ try{ await assetsApi.delete(f.id); }catch(e){} }
+  const host = document.getElementById("gridHost") || document.getElementById("viewGrid");
+  if(host) renderGrid(host, branchOrViewDoc(), currentUser.type==="branch", viewYear, viewMonth);
   openAttachModal(day, true);
 }
 function closeModal(){ const h=document.getElementById("modalHost"); if(h) h.innerHTML=""; }
@@ -1556,8 +1558,25 @@ async function renderAdminDashboard(){
       </table></div>
       <p class="hint" style="margin-top:12px;">إعادة التعيين بتمسح كلمة السر الحالية فقط (من غير ما تلمس بيانات المبيعات)، وبعدها الفرع يدخل بكوده من شاشة الدخول ويعمل كلمة سر جديدة من نفس المكان.</p>
     </div>
+    <div class="card">
+      <h3>مسح بيانات شهر</h3>
+      <p class="hint">اختار السنة والشهر ثم اضغط "مسح الشهر" — بينعمل بيه موافقتين وتأكيد، وبيتمسح الشهر اللي بتختاره انت بس من كل الفروع (المبالغ والملاحظات والمرفقات). باقي الشهور والبيانات لسه محفوظة وثابتة، ومفيش حاجة بتتتمسح تلقائياً.</p>
+      <div class="row" style="margin-top:4px;">
+        <select id="adminDelYear" style="flex:1;"></select>
+        <select id="adminDelMonth" style="flex:1;"></select>
+        <div class="spacer"></div>
+        <button id="adminDelBtn" class="danger" onclick="confirmDeleteAdminMonth()">مسح الشهر</button>
+      </div>
+      <div id="adminDelStatus" style="margin-top:6px;"></div>
+    </div>
     <div id="modalHost"></div>
   `;
+  const dy = document.getElementById("adminDelYear");
+  for(let y=CUR_YEAR; y>=202 Day; y--) dy.innerHTML += `<option value="${y}">${y}</option>`;
+  dy.value = String(CUR_YEAR);
+  const dm = document.getElementById("adminDelMonth");
+  for(let mm=1; mm<=12; mm++) dm.innerHTML += `<option value="${mm}">${monthNamesArabic[mm-1] || mm}</option>`;
+  dm.value = String(CUR_MONTH);
 }
 async function resetBranchPassword(code){
   if(!confirm("متأكد إنك عايز تصفّر كلمة سر فرع " + code + "؟ الفرع هيحتاج يعمل كلمة سر جديدة أول ما يدخل.")) return;
