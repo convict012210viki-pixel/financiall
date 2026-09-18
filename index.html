@@ -14,6 +14,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
 :root{
   --bg:#f4f6fa; --card:#ffffff; --text:#182131; --muted:#67728a; --border:#e6e9f0;
@@ -201,6 +204,16 @@ const FINANCE_USER = "finance";
 const ADMIN_USER = "admin";
 const CHART_COLORS = ["#2954e6","#0aa06e","#e08a00","#d92d20","#7048e8","#15aabf","#e8590c","#37b24d","#f06595","#4263eb","#0ca678","#fab005"];
 
+/* ======================= FIREBASE CONFIG (شغّل الربط والحفظ المشترك بين كل الأجهزة) ======================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCOByUCzzgHc09YbIPKDy_C6Z27A0atbTY",
+  authDomain: "financial-16678.firebaseapp.com",
+  projectId: "financial-16678",
+  storageBucket: "financial-16678.firebasestorage.app",
+  messagingSenderId: "340478983554",
+  appId: "1:340478983554:web:32212f7ee653291c35e39b"
+};
+
 /* ======================= STATE ======================= */
 let db = null, assetsApi = null, downloadsApi = null;
 let currentUser = null; // {type:'branch'|'finance'|'admin', code}
@@ -343,10 +356,47 @@ function normalizeSalesDoc(doc, branch, monthKey){
 }
 
 /* ======================= APP INIT ======================= */
+async function migrateLocalToDb(){
+  if(db===null || !branchStoreAvailable()) return;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(SALES_PREFIX)){
+        const val = lsGet(k, null);
+        if(!val) continue;
+        const id = k.slice(SALES_PREFIX.length);
+        const snap = await db.doc("sales/"+id).get();
+        if(!(snap && snap.exists)) await db.doc("sales/"+id).set(val);
+      }
+    }
+    const authMap = lsGet(AUTH_KEY, {});
+    for(const id in authMap){
+      const snap = await db.doc("auth/"+id).get();
+      if(!(snap && snap.exists)) await db.doc("auth/"+id).set(authMap[id]);
+    }
+  }catch(e){}
+}
+
 async function init(){
   try{ db = await claude.use("db"); }catch(e){ db = null; }
-  if(!db) db = null;
-  try{ assetsApi = await claude.use("assets"); }catch(e){ assetsApi = null; }
+  if(!db && typeof firebase!=="undefined" && FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey!=="PASTE_HERE"){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.firestore();
+      const stRef = firebase.storage();
+      assetsApi = {
+        upload: async (blob, opts)=>{
+          const name = "attachments/" + Date.now() + "_" + Math.random().toString(36).slice(2);
+          const ref = stRef.ref(name);
+          await ref.put(blob, {contentType: (opts && opts.type) || blob.type || "image/jpeg"});
+          const url = await ref.getDownloadURL();
+          return {id: name, url};
+        }
+      };
+    }catch(e){ db = null; assetsApi = null; }
+  }
+  if(db) migrateLocalToDb();
+  try{ if(!assetsApi) assetsApi = await claude.use("assets"); }catch(e){ assetsApi = null; }
   try{ downloadsApi = await claude.use("downloads"); }catch(e){ downloadsApi = null; }
   renderLogin();
 }
